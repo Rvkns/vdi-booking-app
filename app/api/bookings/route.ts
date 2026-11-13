@@ -3,18 +3,21 @@ import { z } from "zod";
 import { query, queryOne } from "@/lib/db";
 import { getCurrentSession } from "@/lib/session";
 import { validateBookingSlot } from "@/lib/booking-rules";
+import { dayBounds } from "@/lib/slots";
+import { startOfWeek, todayRome } from "@/lib/calendar";
 
-/** GET /api/bookings — prenotazioni future (non ancora concluse) dell'utente corrente. */
+/** GET /api/bookings — prenotazioni attive dell'utente corrente (dalla settimana corrente in poi). */
 export async function GET() {
   const session = await getCurrentSession();
   if (!session) return NextResponse.json({ error: "Non autenticato." }, { status: 401 });
 
-  const rows = await query<{ id: number; start: Date; end: Date }>(
-    `SELECT id, lower(slot) AS start, upper(slot) AS "end"
+  const weekStart = dayBounds(startOfWeek(todayRome())).start.toISOString();
+  const rows = await query<{ id: number; start: Date; end: Date; note: string | null }>(
+    `SELECT id, lower(slot) AS start, upper(slot) AS "end", note
      FROM bookings
-     WHERE participant_id = $1 AND stato = 'Confermata' AND upper(slot) > now()
+     WHERE participant_id = $1 AND stato = 'Confermata' AND upper(slot) >= $2
      ORDER BY lower(slot)`,
-    [session.participantId]
+    [session.participantId, weekStart]
   );
   return NextResponse.json({ bookings: rows });
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Upload, KeyRound, RefreshCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Upload, KeyRound, RefreshCcw, CalendarDays } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LessonsAdmin } from "@/components/admin/lessons-admin";
@@ -13,12 +14,14 @@ import { AppHeader } from "@/components/app-header";
 
 type Participant = {
   id: number;
-  source_id: number;
+  source_id: number | null;
   nome: string;
   cognome: string;
   username: string;
   tipo_utente: "TMI" | "External";
   is_active: boolean;
+  is_admin?: boolean;
+  data_nascita?: string | null;
   must_reset_password: boolean;
   has_password: boolean;
   livello_atteso: number | null;
@@ -96,7 +99,18 @@ export default function AdminPage() {
       <AppHeader
         title="Pannello amministrativo · AI Lab VDI Booking"
         subtitle="Partecipanti, password e assegnazione lezioni"
-      />
+      >
+        <Link
+          href="/"
+          className={buttonVariants({
+            variant: "outline",
+            size: "sm",
+            className: "border-white/30 text-white hover:bg-white/10",
+          })}
+        >
+          <CalendarDays className="h-4 w-4" /> Calendario VDI
+        </Link>
+      </AppHeader>
       <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
       <nav className="flex gap-1 border-b border-border">
         {([
@@ -244,6 +258,7 @@ export default function AdminPage() {
                     <th className="py-2 pr-3">Livello atteso</th>
                     <th className="py-2 pr-3">Livello svolto</th>
                     <th className="py-2 pr-3">Utente</th>
+                    <th className="py-2 pr-3">Data di nascita</th>
                     <th className="py-2 pr-3">Stato</th>
                     <th className="py-2 pr-3">Password</th>
                     <th className="py-2 pr-3"></th>
@@ -267,8 +282,12 @@ export default function AdminPage() {
                           </div>
                         </td>
                         <td className="py-2 pr-3 font-mono text-xs">{p.username}</td>
+                        <td className="py-2 pr-3 font-mono text-xs text-muted-foreground">
+                          {p.data_nascita ? p.data_nascita.split("-").reverse().join("/") : "—"}
+                        </td>
                         <td className="py-2 pr-3">
                           <div className="flex flex-wrap gap-1">
+                            {p.is_admin && <Badge variant="default">Admin</Badge>}
                             {!p.is_active && <Badge variant="muted">Non più nel file</Badge>}
                             {p.is_active && <Badge variant="success">Attivo</Badge>}
                             {p.must_reset_password && <Badge variant="muted">Da reimpostare</Badge>}

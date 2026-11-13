@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin-guard";
+import { isAdminUsername } from "@/lib/config";
 import { computeProgress, type LessonRef } from "@/lib/levels";
 
 export async function GET() {
@@ -9,6 +10,8 @@ export async function GET() {
   const rows = await query<any>(
     `SELECT id, source_id, nome, cognome, username, tipo_utente,
             is_active, must_reset_password, updated_at, livello_atteso, livello_affrontato,
+            to_char(data_nascita, 'YYYY-MM-DD') AS data_nascita,
+            COALESCE(is_admin, false) AS is_admin,
             (password_enc IS NOT NULL) AS has_password
      FROM participants ORDER BY cognome, nome`
   );
@@ -30,6 +33,7 @@ export async function GET() {
     );
     return {
       ...p,
+      is_admin: Boolean(p.is_admin || isAdminUsername(p.username)),
       done: progress.done,
       scheduled: progress.scheduled,
       next: progress.next,

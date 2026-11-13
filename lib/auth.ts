@@ -43,6 +43,7 @@ export type SessionPayload = {
   username: string;
   nome: string;
   cognome: string;
+  isAdmin?: boolean;
 };
 
 export async function createSessionToken(payload: SessionPayload): Promise<string> {
@@ -103,4 +104,30 @@ export function buildUsername(nome: string, cognome: string, existing: Set<strin
   }
   existing.add(candidate);
   return candidate;
+}
+
+function capitalizeWord(s: string): string {
+  const letters = s.replace(/[0-9]+$/, "");
+  if (!letters) return s;
+  return letters.charAt(0).toUpperCase() + letters.slice(1).toLowerCase();
+}
+
+/**
+ * Valida che lo username sia nel formato nome.cognome (es. valerio.andreuccioli)
+ * e ne ricava Nome e Cognome capitalizzati per i nuovi utenti.
+ */
+export function parseNomeCognomeFromUsername(raw: string): {
+  cleanUsername: string;
+  nome: string;
+  cognome: string;
+} | null {
+  const cleanUsername = raw.trim().toLowerCase();
+  if (!/^[a-z]+\.[a-z0-9]+$/.test(cleanUsername)) {
+    return null;
+  }
+  const [rawNome, rawCognome] = cleanUsername.split(".");
+  const nome = capitalizeWord(rawNome);
+  const cognome = capitalizeWord(rawCognome);
+  if (!nome || !cognome) return null;
+  return { cleanUsername, nome, cognome };
 }

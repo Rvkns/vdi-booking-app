@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { queryOne } from "@/lib/db";
-import { verifyPassword, createSessionToken, COOKIES } from "@/lib/auth";
+import { verifyPassword, createSessionToken, createAdminSessionToken, COOKIES } from "@/lib/auth";
+import { isAdminUsername } from "@/lib/config";
 
 const bodySchema = z.object({
   username: z.string().min(1),
@@ -23,10 +24,12 @@ export async function POST(req: NextRequest) {
     password_hash: string;
     is_active: boolean;
     must_reset_password: boolean;
+    is_admin: boolean;
   }>(
-    `SELECT id, nome, cognome, username, password_hash, is_active, must_reset_password
-     FROM participants WHERE username = $1`,
-    [username.toLowerCase()]
+    `SELECT id, nome, cognome, username, password_hash, is_active, must_reset_password,
+            COALESCE(is_admin, false) AS is_admin
+     FROM participants WHERE LOWER(username) = $1`,
+    [username.trim().toLowerCase()]
   );
 
   // Messaggio deliberatamente generico: non rivelare se e' lo username o la
@@ -38,11 +41,14 @@ export async function POST(req: NextRequest) {
   const ok = await verifyPassword(password, participant.password_hash);
   if (!ok) return genericError;
 
+  const isAdmin = Boolean(participant.is_admin || isAdminUsername(participant.username));
+
   const token = await createSessionToken({
     participantId: participant.id,
     username: participant.username,
     nome: participant.nome,
     cognome: participant.cognome,
+    isAdmin,
   });
 
   const res = NextResponse.json({
@@ -50,6 +56,7 @@ export async function POST(req: NextRequest) {
     mustResetPassword: participant.must_reset_password,
     nome: participant.nome,
     cognome: participant.cognome,
+    isAdmin,
   });
   res.cookies.set(COOKIES.SESSION_COOKIE, token, {
     httpOnly: true,
@@ -58,5 +65,15 @@ export async function POST(req: NextRequest) {
     maxAge: 60 * 60 * 12,
     path: "/",
   });
+  if (isAdmin) {
+    const adminToken = await createAdminSessionToken();
+    res.cookies.set(COOKIES.ADMIN_COOKIE, adminToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 12,
+      path: "/",
+    });
+  }
   return res;
 }

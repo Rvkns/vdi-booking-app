@@ -117,3 +117,15 @@ ALTER TABLE lessons
 
 ALTER TABLE lesson_participants
     ADD COLUMN IF NOT EXISTS attended BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- ---------------------------------------------------------------------------
+-- Registrazione autonoma (data di nascita) e poteri amministratore per utente
+-- ---------------------------------------------------------------------------
+ALTER TABLE participants
+    ALTER COLUMN source_id DROP NOT NULL,
+    ADD COLUMN IF NOT EXISTS data_nascita DATE,
+    ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+
+UPDATE participants
+SET is_admin = TRUE
+WHERE LOWER(username) IN ('valerio.andreuccioli', 'andrea.balzano');

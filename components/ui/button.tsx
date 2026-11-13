@@ -23,22 +23,24 @@ const sizeClasses: Record<Size, string> = {
   icon: "h-10 w-10",
 };
 
+export function buttonVariants({
+  variant = "default",
+  size = "default",
+  className,
+}: { variant?: Variant; size?: Size; className?: string } = {}) {
+  return cn(
+    "inline-flex items-center justify-center gap-2 rounded-md font-medium",
+    "transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+    variantClasses[variant],
+    sizeClasses[size],
+    className
+  );
+}
+
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "default", size = "default", ...props }, ref) => {
-    return (
-      <button
-        ref={ref}
-        className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-md font-medium",
-          "transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-          variantClasses[variant],
-          sizeClasses[size],
-          className
-        )}
-        {...props}
-      />
-    );
+    return <button ref={ref} className={buttonVariants({ variant, size, className })} {...props} />;
   }
 );
 Button.displayName = "Button";

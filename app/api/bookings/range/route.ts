@@ -6,8 +6,8 @@ import { addDays } from "@/lib/calendar";
 
 /**
  * GET /api/bookings/range?from=YYYY-MM-DD&to=YYYY-MM-DD (to incluso)
- * Prenotazioni confermate nell'intervallo, senza dati personali degli altri
- * utenti: per ognuna solo orario e se e' dell'utente corrente.
+ * Prenotazioni confermate nell'intervallo, comprensive del nome e cognome
+ * della persona che ha bloccato lo slot (visibile a tutti gli utenti).
  */
 export async function GET(req: NextRequest) {
   const session = await getCurrentSession();
@@ -25,11 +25,22 @@ export async function GET(req: NextRequest) {
   );
   if (!resource) return NextResponse.json({ error: "Risorsa VDI non configurata." }, { status: 500 });
 
-  const rows = await query<{ id: number; participant_id: number; start: Date; end: Date }>(
-    `SELECT id, participant_id, lower(slot) AS start, upper(slot) AS "end"
-     FROM bookings
-     WHERE resource_id = $1 AND stato = 'Confermata' AND slot && tstzrange($2, $3)
-     ORDER BY lower(slot)`,
+  const rows = await query<{
+    id: number;
+    participant_id: number;
+    start: Date;
+    end: Date;
+    nome: string;
+    cognome: string;
+    username: string;
+    note: string | null;
+  }>(
+    `SELECT b.id, b.participant_id, lower(b.slot) AS start, upper(b.slot) AS "end",
+            p.nome, p.cognome, p.username, b.note
+     FROM bookings b
+     JOIN participants p ON p.id = b.participant_id
+     WHERE b.resource_id = $1 AND b.stato = 'Confermata' AND b.slot && tstzrange($2, $3)
+     ORDER BY lower(b.slot)`,
     [resource.id, dayBounds(from).start.toISOString(), dayBounds(to).end.toISOString()]
   );
 
@@ -39,6 +50,9 @@ export async function GET(req: NextRequest) {
       start: r.start,
       end: r.end,
       mine: r.participant_id === session.participantId,
+      participantName: `${r.nome} ${r.cognome}`,
+      username: r.username,
+      note: r.note,
     })),
   });
 }

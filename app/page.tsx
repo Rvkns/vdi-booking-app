@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { LogOut, Sun, Moon } from "lucide-react";
+import Link from "next/link";
+import { LogOut, Sun, Moon, ShieldCheck } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { useTheme } from "next-themes";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { LoginForm } from "@/components/booking/login-form";
 import { ChangePasswordForm } from "@/components/booking/change-password-form";
 import { LoginWiki } from "@/components/wiki/login-wiki";
@@ -13,7 +14,7 @@ import { VdiCalendar } from "@/components/booking/vdi-calendar";
 import { LessonsPanel, NextLessonBanner, type MyLessons } from "@/components/booking/lessons-panel";
 import { cn } from "@/lib/utils";
 
-type Me = { authenticated: boolean; nome?: string; cognome?: string };
+type Me = { authenticated: boolean; nome?: string; cognome?: string; isAdmin?: boolean };
 
 export default function BookingPage() {
   const [me, setMe] = React.useState<Me | null>(null);
@@ -42,7 +43,7 @@ export default function BookingPage() {
     fetch("/api/lessons")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setLessons(d))
-      .catch(() => {});
+      .catch(() => { });
   }, [authenticated]);
 
   async function handleLogout() {
@@ -59,13 +60,13 @@ export default function BookingPage() {
       <>
         <AppHeader title="Prenotazione VDI · AI Lab" />
         <main className="flex min-h-[calc(100vh-4.5rem)] flex-col items-center justify-center gap-6 p-6">
-        <LoginForm
-          onSuccess={(mustResetPassword) => {
-            setMustReset(mustResetPassword);
-            refreshMe();
-          }}
-        />
-        <LoginWiki />
+          <LoginForm
+            onSuccess={(mustResetPassword) => {
+              setMustReset(mustResetPassword);
+              refreshMe();
+            }}
+          />
+          <LoginWiki />
         </main>
       </>
     );
@@ -84,7 +85,22 @@ export default function BookingPage() {
 
   return (
     <>
-      <AppHeader title="Prenotazione VDI · AI Lab" subtitle={`Ciao ${me.nome} ${me.cognome}`}>
+      <AppHeader
+        title="Prenotazione VDI · AI Lab"
+        subtitle={`Ciao ${me.nome} ${me.cognome}${me.isAdmin ? " · Admin" : ""}`}
+      >
+        {me.isAdmin && (
+          <Link
+            href="/admin"
+            className={buttonVariants({
+              variant: "outline",
+              size: "sm",
+              className: "border-accent bg-accent/20 text-white hover:bg-accent/30",
+            })}
+          >
+            <ShieldCheck className="h-4 w-4" /> Pannello Admin
+          </Link>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -104,32 +120,32 @@ export default function BookingPage() {
         </Button>
       </AppHeader>
       <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
-      <NextLessonBanner lessons={lessons} onOpen={() => setTab("lessons")} />
+        <NextLessonBanner lessons={lessons} onOpen={() => setTab("lessons")} />
 
-      <nav className="flex gap-1 border-b border-border">
-        {([
-          ["vdi", "Prenota VDI"],
-          ["lessons", "Le mie lezioni"],
-          ["guide", "Guida"],
-        ] as const).map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={cn(
-              "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-              tab === id ? "border-accent text-accent" : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+        <nav className="flex gap-1 border-b border-border">
+          {([
+            ["vdi", "Prenota VDI"],
+            ["lessons", "Le mie lezioni"],
+            ["guide", "Guida"],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={cn(
+                "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+                tab === id ? "border-accent text-accent" : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
 
-      <section>
-        {tab === "vdi" && <VdiCalendar />}
-        {tab === "lessons" && <LessonsPanel lessons={lessons} />}
-        {tab === "guide" && <UserWiki />}
-      </section>
+        <section>
+          {tab === "vdi" && <VdiCalendar isAdmin={Boolean(me.isAdmin)} />}
+          {tab === "lessons" && <LessonsPanel lessons={lessons} />}
+          {tab === "guide" && <UserWiki />}
+        </section>
       </main>
     </>
   );

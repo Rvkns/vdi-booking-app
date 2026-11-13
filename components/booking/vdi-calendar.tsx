@@ -7,24 +7,48 @@ import { BookingDialog, type EditingBooking } from "@/components/booking/booking
 import { CalendarToolbar } from "@/components/calendar/toolbar";
 import { MonthView, WeekView, YearView, type CalEvent, type YearTone } from "@/components/calendar/views";
 import { isBookableDay } from "@/lib/holidays";
-import { BOOKING_HORIZON_END, generateDaySlots, romeDateString } from "@/lib/slots";
+import { BOOKING_HORIZON_END, DAY_END_HOUR, DAY_START_HOUR, generateDaySlots, romeDateString } from "@/lib/slots";
 import {
   addDays,
   clampStr,
+  fmtMinutes,
   longDate,
   periodRange,
   romeMinutes,
   romeTime,
+  startOfWeek,
   todayRome,
   type CalView,
 } from "@/lib/calendar";
+import { cn } from "@/lib/utils";
 
-type Booking = { id: number; start: string; end: string; mine: boolean };
-type Mine = { id: number; start: string; end: string };
-type Editor = { booking: EditingBooking; date: string; start?: number };
+type Booking = {
+  id: number;
+  start: string;
+  end: string;
+  mine: boolean;
+  participantName: string;
+  username?: string;
+  note?: string | null;
+};
+type Mine = { id: number; start: string; end: string; note?: string | null };
+type Editor = {
+  booking: EditingBooking;
+  date: string;
+  startTime?: string;
+  endTime?: string;
+};
 
-export function VdiCalendar() {
+function getInitials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "U";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+export function VdiCalendar({ isAdmin = false }: { isAdmin?: boolean }) {
   const today = todayRome();
+  const minDate = startOfWeek(today);
   const [view, setView] = React.useState<CalView>("week");
   const [anchor, setAnchor] = React.useState(today);
   const [bookings, setBookings] = React.useState<Booking[]>([]);
@@ -60,8 +84,6 @@ export function VdiCalendar() {
       .catch(() => {});
   }, [reloadKey]);
 
-  const now = Date.now();
-  const takenByStart = React.useMemo(() => new Map(bookings.map((b) => [new Date(b.start).getTime(), b])), [bookings]);
   const byDay = React.useMemo(() => {
     const m = new Map<string, Booking[]>();
     for (const b of bookings) {
@@ -71,48 +93,120 @@ export function VdiCalendar() {
     return m;
   }, [bookings]);
 
-  /** Slot liberi (futuri, non occupati) e prenotazioni dell'utente in un giorno. */
+  /** Verifica se lo slot da 30 minuti [startMin, startMin + 30) del giorno d è già coperto da una prenotazione. */
+  function isSlotBooked(d: string, startMin: number): boolean {
+    const dayList = byDay.get(d);
+    if (!dayList || dayList.length === 0) return false;
+    const endMin = startMin + 30;
+    return dayList.some((b) => {
+      const sMin = romeMinutes(new Date(b.start));
+      const eMin = romeMinutes(new Date(b.end)) || DAY_END_HOUR * 60;
+      return startMin < eMin && endMin > sMin;
+    });
+  }
+
+  /** Riepilogo giornaliero per le viste Mese e Anno. */
   function daySummary(d: string) {
-    const slots = generateDaySlots(d);
-    const free = slots.filter((s) => s.start.getTime() > now && !takenByStart.has(s.start.getTime())).length;
-    const mine = (byDay.get(d) ?? []).filter((b) => b.mine).length;
-    const taken = (byDay.get(d) ?? []).length;
-    return { total: slots.length, free, mine, taken };
+    const totalHalfSlots = isBookableDay(d) ? (DAY_END_HOUR - DAY_START_HOUR) * 2 : 0;
+    const dayBookings = byDay.get(d) ?? [];
+    let bookedHalfSlots = 0;
+    for (let m = DAY_START_HOUR * 60; m < DAY_END_HOUR * 60; m += 30) {
+      if (isSlotBooked(d, m)) bookedHalfSlots += 1;
+    }
+    const freeHalfSlots = Math.max(0, totalHalfSlots - bookedHalfSlots);
+    const mineCount = dayBookings.filter((b) => b.mine).length;
+    return {
+      total: totalHalfSlots,
+      free: freeHalfSlots,
+      mine: mineCount,
+      taken: dayBookings.length,
+      dayBookings,
+    };
   }
 
   const events: CalEvent[] = bookings.map((b) => {
     const start = new Date(b.start);
     const end = new Date(b.end);
-    const editable = b.mine && end.getTime() > now;
+    const displayName = b.participantName || "Utente";
+    const canEdit = b.mine || isAdmin;
     return {
       id: `b${b.id}`,
       dateStr: romeDateString(start),
       startMin: romeMinutes(start),
       endMin: romeMinutes(end) || 24 * 60,
-      title: b.mine ? "Tua prenotazione" : "Occupato",
+      title: b.mine ? `${displayName} (Tu)` : displayName,
       subtitle: `${romeTime(start)} – ${romeTime(end)}`,
+      initials: getInitials(displayName),
+      note: b.note,
       tone: b.mine ? "mine" : "taken",
-      onClick: editable
-        ? () => setEditor({ booking: { id: b.id, start: b.start, end: b.end }, date: romeDateString(start) })
-        : undefined,
+      onClick: () =>
+        setEditor({
+          booking: {
+            id: b.id,
+            start: b.start,
+            end: b.end,
+            mine: b.mine,
+            canEdit,
+            participantName: displayName,
+            note: b.note,
+          },
+          date: romeDateString(start),
+        }),
     };
   });
 
   function cellDisabled(d: string, hour: number) {
-    const slot = generateDaySlots(d)[hour - 9];
-    if (!slot) return true;
-    return slot.start.getTime() <= now || takenByStart.has(slot.start.getTime());
+    if (!isBookableDay(d) || d < minDate || d > BOOKING_HORIZON_END) return true;
+    return isSlotBooked(d, hour * 60) && isSlotBooked(d, hour * 60 + 30);
+  }
+
+  function slotDisabled(d: string, startMin: number) {
+    if (!isBookableDay(d) || d < minDate || d > BOOKING_HORIZON_END) return true;
+    return isSlotBooked(d, startMin);
   }
 
   function onCellClick(d: string, hour: number) {
-    const slot = generateDaySlots(d)[hour - 9];
-    if (slot) setEditor({ booking: null, date: d, start: slot.start.getTime() });
+    const startTime = `${String(hour).padStart(2, "0")}:00`;
+    const endTime = `${String(hour).padStart(2, "0")}:30`;
+    setEditor({ booking: null, date: d, startTime, endTime });
+  }
+
+  function onSlotRangeSelect(d: string, startMin: number, endMin: number) {
+    // Se nel range trascinato c'è uno slot da 30m già occupato, fermati prima dello slot occupato
+    let validEndMin = startMin + 30;
+    for (let m = startMin; m < endMin; m += 30) {
+      if (isSlotBooked(d, m)) break;
+      validEndMin = m + 30;
+    }
+    const startTime = fmtMinutes(startMin);
+    const endTime = fmtMinutes(Math.min(DAY_END_HOUR * 60, validEndMin));
+    setEditor({ booking: null, date: d, startTime, endTime });
+  }
+
+  function newBookingForDay(d: string) {
+    if (!isBookableDay(d)) return;
+    let firstFreeMin = DAY_START_HOUR * 60;
+    for (let m = DAY_START_HOUR * 60; m < DAY_END_HOUR * 60; m += 30) {
+      if (!isSlotBooked(d, m)) {
+        firstFreeMin = m;
+        break;
+      }
+    }
+    const endMin = !isSlotBooked(d, firstFreeMin + 30)
+      ? Math.min(DAY_END_HOUR * 60, firstFreeMin + 60)
+      : Math.min(DAY_END_HOUR * 60, firstFreeMin + 30);
+    setEditor({
+      booking: null,
+      date: d,
+      startTime: fmtMinutes(firstFreeMin),
+      endTime: fmtMinutes(endMin),
+    });
   }
 
   function newBooking() {
     let d = clampStr(anchor, today, BOOKING_HORIZON_END);
     for (let i = 0; i < 10 && !isBookableDay(d); i++) d = addDays(d, 1);
-    setEditor({ booking: null, date: d });
+    newBookingForDay(d);
   }
 
   const goWeek = (d: string) => {
@@ -126,16 +220,16 @@ export function VdiCalendar() {
         view={view}
         anchor={anchor}
         today={today}
-        minDate={today}
+        minDate={minDate}
         maxDate={BOOKING_HORIZON_END}
         loading={loading}
         onChange={(v, a) => {
           setView(v);
-          setAnchor(clampStr(a, today, BOOKING_HORIZON_END));
+          setAnchor(clampStr(a, minDate, BOOKING_HORIZON_END));
         }}
         right={
           <Button size="sm" onClick={newBooking}>
-            <Plus className="h-4 w-4" /> Nuova prenotazione
+            <Plus className="h-4 w-4" /> Blocca slot
           </Button>
         }
       />
@@ -150,11 +244,13 @@ export function VdiCalendar() {
         <WeekView
           anchor={anchor}
           today={today}
-          minDate={today}
+          minDate={minDate}
           maxDate={BOOKING_HORIZON_END}
           events={events}
           cellDisabled={cellDisabled}
+          slotDisabled={slotDisabled}
           onCellClick={onCellClick}
+          onSlotRangeSelect={onSlotRangeSelect}
         />
       )}
 
@@ -162,21 +258,33 @@ export function VdiCalendar() {
         <MonthView
           anchor={anchor}
           today={today}
-          minDate={today}
+          minDate={minDate}
           maxDate={BOOKING_HORIZON_END}
-          onDayClick={goWeek}
+          onDayClick={newBookingForDay}
           renderDay={(d) => {
             const s = daySummary(d);
             if (s.total === 0) return null;
             return (
               <div className="flex flex-col gap-0.5 text-[11px] leading-tight">
-                {s.mine > 0 && (
-                  <span className="rounded bg-accent/15 px-1 py-0.5 font-medium text-accent">
-                    {s.mine === 1 ? "1 tua prenotazione" : `${s.mine} tue prenotazioni`}
+                {s.dayBookings.slice(0, 3).map((b) => (
+                  <span
+                    key={b.id}
+                    className={cn(
+                      "truncate rounded border-l-2 px-1 py-0.5 font-medium",
+                      b.mine
+                        ? "border-l-accent bg-accent/15 text-accent"
+                        : "border-l-foreground/60 bg-muted text-foreground"
+                    )}
+                    title={`${romeTime(new Date(b.start))}–${romeTime(new Date(b.end))} · ${b.participantName}`}
+                  >
+                    {romeTime(new Date(b.start))} {b.participantName}
                   </span>
+                ))}
+                {s.dayBookings.length > 3 && (
+                  <span className="text-[10px] text-muted-foreground">+{s.dayBookings.length - 3} altri</span>
                 )}
                 {s.free > 0 ? (
-                  <span className="text-muted-foreground">{s.free} liberi</span>
+                  <span className="text-muted-foreground">{s.free} ore libere</span>
                 ) : (
                   s.taken > 0 && <span className="text-muted-foreground">Completo</span>
                 )}
@@ -190,12 +298,12 @@ export function VdiCalendar() {
         <YearView
           anchor={anchor}
           today={today}
-          minDate={today}
+          minDate={minDate}
           maxDate={BOOKING_HORIZON_END}
           onDayClick={goWeek}
           onMonthClick={(m) => {
             setView("month");
-            setAnchor(clampStr(m, today, BOOKING_HORIZON_END));
+            setAnchor(clampStr(m, minDate, BOOKING_HORIZON_END));
           }}
           dayTone={(d): YearTone => {
             const s = daySummary(d);
@@ -214,7 +322,8 @@ export function VdiCalendar() {
         <BookingDialog
           booking={editor.booking}
           initialDate={editor.date}
-          initialStart={editor.start}
+          initialStartTime={editor.startTime}
+          initialEndTime={editor.endTime}
           onClose={() => setEditor(null)}
           onDone={() => {
             setEditor(null);
@@ -225,7 +334,12 @@ export function VdiCalendar() {
 
       <MyBookings
         items={mine}
-        onEdit={(b) => setEditor({ booking: b, date: romeDateString(new Date(b.start)) })}
+        onEdit={(b) =>
+          setEditor({
+            booking: { ...b, mine: true, canEdit: true },
+            date: romeDateString(new Date(b.start)),
+          })
+        }
       />
     </div>
   );
@@ -235,14 +349,14 @@ function Legend({ view }: { view: CalView }) {
   const items =
     view === "year"
       ? [
-          ["bg-accent", "Hai una prenotazione"],
-          ["bg-muted-foreground/20", "Alcuni slot occupati"],
+          ["bg-accent", "Hai uno slot bloccato"],
+          ["bg-muted-foreground/20", "Alcuni slot bloccati"],
           ["bg-foreground/60", "Giornata completa"],
         ]
       : [
-          ["bg-accent/15 border border-accent", "Tua prenotazione"],
-          ["bg-muted border border-border", "Occupato"],
-          ["bg-card border border-border", "Libero (clicca per prenotare)"],
+          ["bg-accent/15 border-l-4 border-accent", "Tuo slot bloccato"],
+          ["bg-muted border-l-4 border-foreground/60", "Bloccato da altro utente"],
+          ["bg-card border border-border", "Libero (clicca o trascina sulle celle per bloccare)"],
         ];
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -251,7 +365,7 @@ function Legend({ view }: { view: CalView }) {
           <span className={`h-3 w-3 rounded-sm ${cls}`} /> {label}
         </span>
       ))}
-      <span>Prenotabile fino al 31/03/2030 · lun-ven 09:00-18:00 · ogni slot è esclusivo</span>
+      <span>Clicca su una cella (o trascina su più ore) come su Microsoft Teams per bloccare uno slot</span>
     </div>
   );
 }
@@ -260,7 +374,7 @@ function MyBookings({ items, onEdit }: { items: Mine[]; onEdit: (b: Mine) => voi
   if (items.length === 0) return null;
   return (
     <section className="mt-2 rounded-lg border border-border bg-card p-3">
-      <h3 className="mb-2 text-sm font-semibold">Le tue prenotazioni ({items.length})</h3>
+      <h3 className="mb-2 text-sm font-semibold">I tuoi slot bloccati ({items.length})</h3>
       <ul className="flex flex-col divide-y divide-border">
         {items.map((b) => {
           const start = new Date(b.start);
@@ -269,9 +383,10 @@ function MyBookings({ items, onEdit }: { items: Mine[]; onEdit: (b: Mine) => voi
               <span>
                 <span className="first-letter:uppercase">{longDate(romeDateString(start))}</span> · {romeTime(start)}–
                 {romeTime(new Date(b.end))}
+                {b.note && <span className="ml-2 italic text-muted-foreground">({b.note})</span>}
               </span>
               <Button size="sm" variant="outline" onClick={() => onEdit(b)}>
-                Modifica o annulla
+                Modifica o sblocca
               </Button>
             </li>
           );

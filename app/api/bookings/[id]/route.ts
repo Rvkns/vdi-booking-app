@@ -3,12 +3,12 @@ import { z } from "zod";
 import { pool } from "@/lib/db";
 import { validateBookingSlot } from "@/lib/booking-rules";
 import { getCurrentSession } from "@/lib/session";
+import { requireAdmin } from "@/lib/admin-guard";
 
 /**
  * DELETE /api/bookings/:id
- * Annulla una prenotazione. Consentito solo al proprietario della
- * prenotazione stessa (nessun amministratore puo' cancellarla da qui;
- * per quello si veda il pannello admin separato, se necessario in futuro).
+ * Sblocca/annulla una prenotazione. Consentito al proprietario dello slot
+ * oppure a un amministratore.
  */
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getCurrentSession();
@@ -18,11 +18,19 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const id = Number(rawId);
   if (!Number.isInteger(id)) return NextResponse.json({ error: "Id non valido." }, { status: 400 });
 
-  const result = await pool.query(
-    `UPDATE bookings SET stato = 'Annullata'
-     WHERE id = $1 AND participant_id = $2 AND stato = 'Confermata'`,
-    [id, session.participantId]
-  );
+  const isAdmin = await requireAdmin();
+
+  const result = isAdmin
+    ? await pool.query(
+        `UPDATE bookings SET stato = 'Annullata'
+         WHERE id = $1 AND stato = 'Confermata'`,
+        [id]
+      )
+    : await pool.query(
+        `UPDATE bookings SET stato = 'Annullata'
+         WHERE id = $1 AND participant_id = $2 AND stato = 'Confermata'`,
+        [id, session.participantId]
+      );
 
   if (result.rowCount === 0) {
     return NextResponse.json(
@@ -33,12 +41,16 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   return NextResponse.json({ ok: true });
 }
 
-const moveSchema = z.object({ start: z.string(), end: z.string() });
+const moveSchema = z.object({
+  start: z.string(),
+  end: z.string(),
+  note: z.string().max(280).optional(),
+});
 
 /**
- * PATCH /api/bookings/:id — sposta una propria prenotazione futura su un altro
- * slot. L'UPDATE e' atomico: se il nuovo slot e' occupato, il vincolo EXCLUDE
- * del database lo rifiuta (409) e la prenotazione originale resta invariata.
+ * PATCH /api/bookings/:id — modifica orario o nota di una prenotazione.
+ * L'UPDATE e' atomico: se il nuovo slot si sovrappone a un altro, il vincolo
+ * EXCLUDE del database lo rifiuta (409).
  */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getCurrentSession();
@@ -54,15 +66,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const slot = validateBookingSlot(parsed.data.start, parsed.data.end);
   if (!slot.ok) return NextResponse.json({ error: slot.error }, { status: 400 });
 
+  const isAdmin = await requireAdmin();
+
   try {
-    const result = await pool.query(
-      `UPDATE bookings SET slot = tstzrange($1, $2)
-       WHERE id = $3 AND participant_id = $4 AND stato = 'Confermata' AND lower(slot) > now()`,
-      [slot.start.toISOString(), slot.end.toISOString(), id, session.participantId]
-    );
+    const result = isAdmin
+      ? await pool.query(
+          `UPDATE bookings
+           SET slot = tstzrange($1, $2),
+               note = COALESCE($4, note)
+           WHERE id = $3 AND stato = 'Confermata'`,
+          [slot.start.toISOString(), slot.end.toISOString(), id, parsed.data.note ?? null]
+        )
+      : await pool.query(
+          `UPDATE bookings
+           SET slot = tstzrange($1, $2),
+               note = COALESCE($5, note)
+           WHERE id = $3 AND participant_id = $4 AND stato = 'Confermata'`,
+          [slot.start.toISOString(), slot.end.toISOString(), id, session.participantId, parsed.data.note ?? null]
+        );
     if (result.rowCount === 0) {
       return NextResponse.json(
-        { error: "Prenotazione non trovata, annullata, già iniziata o non di tua proprietà." },
+        { error: "Prenotazione non trovata, annullata o non di tua proprietà." },
         { status: 404 }
       );
     }
@@ -70,11 +94,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   } catch (err: any) {
     if (err?.code === "23P01") {
       return NextResponse.json(
-        { error: "Il nuovo slot è appena stato prenotato da un altro utente. Scegline un altro." },
+        { error: "Lo slot selezionato si sovrappone a una prenotazione già esistente." },
         { status: 409 }
       );
     }
     console.error(err);
-    return NextResponse.json({ error: "Errore durante lo spostamento." }, { status: 500 });
+    return NextResponse.json({ error: "Errore durante la modifica." }, { status: 500 });
   }
 }

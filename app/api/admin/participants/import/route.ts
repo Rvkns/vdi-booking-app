@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool, query } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin-guard";
 import { parseParticipantsCsvDetailed } from "@/lib/csv";
-import { buildUsername, generateTemporaryPassword, hashPassword } from "@/lib/auth";
+import { buildUsername, generateTemporaryPassword, hashPassword, slugifyName } from "@/lib/auth";
+import { isAdminUsername } from "@/lib/config";
 import { encryptPassword } from "@/lib/vault";
 
 /**
@@ -39,14 +40,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e.message ?? "CSV non valido." }, { status: 400 });
   }
 
-  const existingUsernames = new Set(
-    (await query<{ username: string }>(`SELECT username FROM participants`)).map((r) => r.username)
+  const existingRows = await query<{ id: number; source_id: number | null; username: string }>(
+    `SELECT id, source_id, username FROM participants`
   );
+  const existingUsernames = new Set(existingRows.map((r) => r.username));
   const existingBySourceId = new Map(
-    (await query<{ id: number; source_id: number }>(`SELECT id, source_id FROM participants`)).map((r) => [
-      r.source_id,
-      r.id,
-    ])
+    existingRows.filter((r) => r.source_id !== null).map((r) => [r.source_id as number, r.id])
+  );
+  const existingUnlinkedByUsername = new Map(
+    existingRows.filter((r) => r.source_id === null).map((r) => [r.username.toLowerCase(), r.id])
   );
 
   const client = await pool.connect();
@@ -57,12 +59,15 @@ export async function POST(req: NextRequest) {
     await client.query("BEGIN");
 
     for (const row of rows) {
-      const existingId = existingBySourceId.get(row.sourceId);
+      const baseUsername = `${slugifyName(row.nome)}.${slugifyName(row.cognome)}`;
+      const existingId =
+        existingBySourceId.get(row.sourceId) ?? existingUnlinkedByUsername.get(baseUsername);
       if (existingId) {
         // I livelli si aggiornano solo se le colonne sono presenti nel CSV.
         await client.query(
           `UPDATE participants
-           SET nome = $1, cognome = $2, tipo_utente = $3,
+           SET source_id = COALESCE(source_id, $9),
+               nome = $1, cognome = $2, tipo_utente = $3,
                livello_atteso = CASE WHEN $5 THEN $6::smallint ELSE livello_atteso END,
                livello_affrontato = CASE WHEN $7 THEN $8::smallint ELSE livello_affrontato END,
                is_active = true, updated_at = now()
@@ -71,24 +76,27 @@ export async function POST(req: NextRequest) {
             row.nome, row.cognome, row.tipoUtente, existingId,
             row.livelloAtteso !== undefined, row.livelloAtteso ?? null,
             row.livelloAffrontato !== undefined, row.livelloAffrontato ?? 0,
+            row.sourceId,
           ]
         );
+        existingUnlinkedByUsername.delete(baseUsername);
         updatedIds.push(existingId);
       } else {
         const username = buildUsername(row.nome, row.cognome, existingUsernames);
         const tempPassword = generateTemporaryPassword();
         const passwordHash = await hashPassword(tempPassword);
+        const isAdmin = isAdminUsername(username);
 
         await client.query(
           `INSERT INTO participants
              (source_id, nome, cognome, username, tipo_utente,
               password_hash, password_enc, must_reset_password, is_active,
-              livello_atteso, livello_affrontato)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, true, true, $8, $9)`,
+              livello_atteso, livello_affrontato, is_admin)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, true, true, $8, $9, $10)`,
           [
             row.sourceId, row.nome, row.cognome, username, row.tipoUtente,
             passwordHash, encryptPassword(tempPassword),
-            row.livelloAtteso ?? null, row.livelloAffrontato ?? 0,
+            row.livelloAtteso ?? null, row.livelloAffrontato ?? 0, isAdmin,
           ]
         );
 

@@ -1,47 +1,45 @@
 import { OWNERS } from "@/lib/config";
 import { Bullets, Code, Note, Steps, WikiSection } from "./wiki";
 
-/** Guida mostrata nella pagina di login: come ottenere l'accesso e primo accesso. */
+/** Guida mostrata nella pagina di login: registrazione, accesso e recupero password. */
 export function LoginWiki() {
   return (
     <div className="flex w-full max-w-sm flex-col gap-2">
       <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Prima volta? Come si accede
       </h2>
-      <WikiSection title="Come ottenere l'accesso" defaultOpen>
+      <WikiSection title="Come registrarsi" defaultOpen>
         <Steps>
           <li>
-            Chiedi la <strong>prima password</strong> agli owner dell&apos;app:
-            <Bullets>
-              {OWNERS.map((o) => (
-                <li key={o}>{o}</li>
-              ))}
-            </Bullets>
+            Seleziona la scheda <strong>Registrati</strong> nel modulo qui sopra.
           </li>
           <li>
-            Il <strong>nome utente</strong> è <Code>nome.cognome</Code> in minuscolo, senza accenti né spazi (es.{" "}
-            <Code>mario.rossi</Code>). In caso di omonimia viene aggiunto un numero (es. <Code>mario.rossi2</Code>):
-            chiedilo agli owner.
+            Inserisci il tuo <strong>nome utente</strong> nel formato <Code>nome.cognome</Code> in minuscolo, senza
+            accenti né spazi (es. <Code>mario.rossi</Code>).
           </li>
           <li>
-            Accedi con la password ricevuta: al <strong>primo accesso</strong> ti verrà chiesto di scegliere una nuova
-            password personale (almeno 8 caratteri).
+            Inserisci la tua <strong>data di nascita</strong> e scegli una <strong>password personale</strong> (almeno 8
+            caratteri).
           </li>
         </Steps>
       </WikiSection>
-      <WikiSection title="Conserva la tua password">
+      <WikiSection title="Password dimenticata">
         <p>
-          Dopo averla scelta, <strong>salvala in un posto sicuro</strong> (ad esempio un password manager).
+          Puoi reimpostare la password in autonomia dalla scheda <strong>Recupera</strong> inserendo il tuo{" "}
+          <Code>nome.cognome</Code>, la tua <strong>data di nascita</strong> e una nuova password.
         </p>
         <Note>
-          Se la perdi, contatta uno degli owner ({OWNERS.join(", ")}): potranno ripristinarla e riceverai una nuova
-          password temporanea da cambiare al primo accesso.
+          In caso di necessità puoi comunque contattare gli amministratori ({OWNERS.join(", ")}) che hanno accesso al
+          pannello di gestione.
         </Note>
       </WikiSection>
-      <WikiSection title="Non riesco ad accedere">
+      <WikiSection title="Accesso Amministratori">
         <Bullets>
-          <li>Controlla di aver scritto il nome utente tutto in minuscolo e nel formato nome.cognome.</li>
-          <li>Se il problema persiste, scrivi a uno degli owner indicando il tuo nome utente.</li>
+          <li>
+            Gli amministratori (<Code>valerio.andreuccioli</Code>, <Code>andrea.balzano</Code>) ricevono automaticamente
+            i poteri di admin effettuando il login o la registrazione e vedono il pulsante{" "}
+            <strong>Pannello Admin</strong> in alto a destra.
+          </li>
         </Bullets>
       </WikiSection>
     </div>
