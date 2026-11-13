@@ -2,7 +2,12 @@
 // Uso: npm run db:init
 import { readFileSync } from "node:fs";
 import { Pool } from "pg";
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
+
+// Stessa precedenza di Next.js: .env.local vince su .env.
+// (dotenv non sovrascrive le variabili gia' definite.)
+loadEnv({ path: ".env.local" });
+loadEnv();
 
 const sql = readFileSync(new URL("../schema.sql", import.meta.url), "utf-8");
 
