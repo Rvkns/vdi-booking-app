@@ -113,6 +113,17 @@ export function UserWiki() {
           possono togliere dal profilo. Se c&apos;è un errore, segnalalo agli amministratori ({OWNERS.join(", ")}).
         </Note>
       </WikiSection>
+      <WikiSection title="Sessioni di formazione nel calendario">
+        <p>
+          Le lezioni organizzate dagli amministratori compaiono nel calendario VDI come fasce{" "}
+          <strong>verdi</strong> con l&apos;etichetta <strong>Formazione</strong>. In quegli orari la macchina è
+          impegnata dalla sessione, quindi lo slot non è prenotabile da nessuno.
+        </p>
+        <Note>
+          Se sei tra i partecipanti, la fascia lo segnala. Il dettaglio delle tue lezioni resta nella scheda{" "}
+          <strong>Le mie lezioni</strong>.
+        </Note>
+      </WikiSection>
     </div>
   );
 }

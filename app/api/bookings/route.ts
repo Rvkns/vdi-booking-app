@@ -3,6 +3,7 @@ import { z } from "zod";
 import { query, queryOne } from "@/lib/db";
 import { getCurrentSession } from "@/lib/session";
 import { validateBookingSlot } from "@/lib/booking-rules";
+import { findLessonOverlap } from "@/lib/lessons";
 import { dayBounds } from "@/lib/slots";
 import { startOfWeek, todayRome } from "@/lib/calendar";
 
@@ -52,6 +53,17 @@ export async function POST(req: NextRequest) {
     [process.env.VDI_RESOURCE_CODE ?? "VDI-AI-01"]
   );
   if (!resource) return NextResponse.json({ error: "Risorsa VDI non configurata." }, { status: 500 });
+
+  // Una sessione di formazione occupa la VDI per tutti.
+  const lesson = await findLessonOverlap(slot.start.toISOString(), slot.end.toISOString());
+  if (lesson) {
+    return NextResponse.json(
+      {
+        error: `In quell'orario la VDI è occupata dalla sessione di formazione "${lesson.title}". Scegli un altro orario.`,
+      },
+      { status: 409 }
+    );
+  }
 
   try {
     const inserted = await queryOne<{ id: number }>(

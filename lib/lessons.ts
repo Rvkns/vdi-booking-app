@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { fromZonedTime } from "date-fns-tz";
 import type { PoolClient } from "pg";
+import { queryOne } from "./db";
 import { isBookableDay } from "./holidays";
 import { MAX_LEVEL } from "./levels";
 import {
@@ -10,6 +11,25 @@ import {
   TIMEZONE,
   isValidDateString,
 } from "./slots";
+
+/**
+ * Una lezione occupa la VDI per tutti: se un intervallo si sovrappone a una
+ * sessione di formazione, lo slot non e' prenotabile. Usata dalle rotte di
+ * creazione e spostamento delle prenotazioni.
+ */
+export async function findLessonOverlap(
+  startIso: string,
+  endIso: string
+): Promise<{ id: number; title: string; start: Date; end: Date } | null> {
+  return queryOne<{ id: number; title: string; start: Date; end: Date }>(
+    `SELECT id, title, lower(slot) AS start, upper(slot) AS "end"
+     FROM lessons
+     WHERE slot && tstzrange($1, $2)
+     ORDER BY lower(slot)
+     LIMIT 1`,
+    [startIso, endIso]
+  );
+}
 
 export class LessonError extends Error {
   constructor(public status: number, message: string) {
@@ -86,6 +106,23 @@ export async function saveLesson(client: PoolClient, id: number | null, input: L
     if (clash.rowCount) {
       const names = clash.rows.map((r) => `${r.nome} ${r.cognome}`).join(", ");
       throw new LessonError(409, `Sovrapposizione con un'altra lezione già assegnata a: ${names}.`);
+    }
+
+    // Simmetrico al controllo lato prenotazioni: la VDI non puo' essere
+    // occupata da una prenotazione e da una lezione nello stesso momento.
+    const booked = await client.query(
+      `SELECT DISTINCT p.nome, p.cognome
+       FROM bookings b JOIN participants p ON p.id = b.participant_id
+       WHERE b.stato = 'Confermata' AND b.slot && tstzrange($1, $2)
+       ORDER BY p.cognome, p.nome`,
+      [start.toISOString(), end.toISOString()]
+    );
+    if (booked.rowCount) {
+      const names = booked.rows.map((r) => `${r.nome} ${r.cognome}`).join(", ");
+      throw new LessonError(
+        409,
+        `In quell'orario la VDI è già prenotata da: ${names}. Annulla la prenotazione o scegli un altro orario.`
+      );
     }
 
     let lessonId = id;

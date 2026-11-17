@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { pool } from "@/lib/db";
 import { validateBookingSlot } from "@/lib/booking-rules";
+import { findLessonOverlap } from "@/lib/lessons";
 import { getCurrentSession } from "@/lib/session";
 import { requireAdmin } from "@/lib/admin-guard";
 
@@ -65,6 +66,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const slot = validateBookingSlot(parsed.data.start, parsed.data.end);
   if (!slot.ok) return NextResponse.json({ error: slot.error }, { status: 400 });
+
+
+  // Una sessione di formazione occupa la VDI per tutti.
+  const lesson = await findLessonOverlap(slot.start.toISOString(), slot.end.toISOString());
+  if (lesson) {
+    return NextResponse.json(
+      {
+        error: `In quell'orario la VDI è occupata dalla sessione di formazione "${lesson.title}". Scegli un altro orario.`,
+      },
+      { status: 409 }
+    );
+  }
 
   const isAdmin = await requireAdmin();
 

@@ -31,6 +31,15 @@ type Booking = {
   username?: string;
   note?: string | null;
 };
+type Lesson = {
+  id: number;
+  start: string;
+  end: string;
+  title: string;
+  level: number;
+  participants: number;
+  mine: boolean;
+};
 type Mine = { id: number; start: string; end: string; note?: string | null };
 type Editor = {
   booking: EditingBooking;
@@ -52,6 +61,7 @@ export function VdiCalendar({ isAdmin = false }: { isAdmin?: boolean }) {
   const [view, setView] = React.useState<CalView>("week");
   const [anchor, setAnchor] = React.useState(today);
   const [bookings, setBookings] = React.useState<Booking[]>([]);
+  const [lessons, setLessons] = React.useState<Lesson[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [reloadKey, setReloadKey] = React.useState(0);
@@ -68,7 +78,10 @@ export function VdiCalendar({ isAdmin = false }: { isAdmin?: boolean }) {
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Impossibile caricare le prenotazioni.");
-        if (!cancelled) setBookings(data.bookings);
+        if (!cancelled) {
+          setBookings(data.bookings);
+          setLessons(data.lessons ?? []);
+        }
       })
       .catch((e) => !cancelled && setLoadError(e.message))
       .finally(() => !cancelled && setLoading(false));
@@ -93,16 +106,29 @@ export function VdiCalendar({ isAdmin = false }: { isAdmin?: boolean }) {
     return m;
   }, [bookings]);
 
-  /** Verifica se lo slot da 30 minuti [startMin, startMin + 30) del giorno d è già coperto da una prenotazione. */
+  const lessonsByDay = React.useMemo(() => {
+    const m = new Map<string, Lesson[]>();
+    for (const l of lessons) {
+      const k = romeDateString(new Date(l.start));
+      m.set(k, [...(m.get(k) ?? []), l]);
+    }
+    return m;
+  }, [lessons]);
+
+  /**
+   * Verifica se lo slot da 30 minuti [startMin, startMin + 30) del giorno d è
+   * già occupato: da una prenotazione oppure da una sessione di formazione
+   * (le lezioni bloccano la VDI per tutti).
+   */
   function isSlotBooked(d: string, startMin: number): boolean {
-    const dayList = byDay.get(d);
-    if (!dayList || dayList.length === 0) return false;
     const endMin = startMin + 30;
-    return dayList.some((b) => {
-      const sMin = romeMinutes(new Date(b.start));
-      const eMin = romeMinutes(new Date(b.end)) || DAY_END_HOUR * 60;
+    const overlaps = (from: string, to: string) => {
+      const sMin = romeMinutes(new Date(from));
+      const eMin = romeMinutes(new Date(to)) || DAY_END_HOUR * 60;
       return startMin < eMin && endMin > sMin;
-    });
+    };
+    if ((byDay.get(d) ?? []).some((b) => overlaps(b.start, b.end))) return true;
+    return (lessonsByDay.get(d) ?? []).some((l) => overlaps(l.start, l.end));
   }
 
   /** Riepilogo giornaliero per le viste Mese e Anno. */
@@ -114,13 +140,15 @@ export function VdiCalendar({ isAdmin = false }: { isAdmin?: boolean }) {
       if (isSlotBooked(d, m)) bookedHalfSlots += 1;
     }
     const freeHalfSlots = Math.max(0, totalHalfSlots - bookedHalfSlots);
-    const mineCount = dayBookings.filter((b) => b.mine).length;
+    const dayLessons = lessonsByDay.get(d) ?? [];
+    const mineCount = dayBookings.filter((b) => b.mine).length + dayLessons.filter((l) => l.mine).length;
     return {
       total: totalHalfSlots,
       free: freeHalfSlots,
       mine: mineCount,
-      taken: dayBookings.length,
+      taken: dayBookings.length + dayLessons.length,
       dayBookings,
+      dayLessons,
     };
   }
 
@@ -154,6 +182,26 @@ export function VdiCalendar({ isAdmin = false }: { isAdmin?: boolean }) {
         }),
     };
   });
+
+  const lessonEvents: CalEvent[] = lessons.map((l) => {
+    const start = new Date(l.start);
+    const end = new Date(l.end);
+    return {
+      id: `l${l.id}`,
+      dateStr: romeDateString(start),
+      startMin: romeMinutes(start),
+      endMin: romeMinutes(end) || 24 * 60,
+      title: `Formazione · ${l.title}`,
+      subtitle: `${romeTime(start)} – ${romeTime(end)} · Livello ${l.level}`,
+      organizer: l.mine ? "Sei tra i partecipanti" : undefined,
+      note: l.mine
+        ? "Sessione di formazione a cui partecipi: la VDI non è prenotabile in questo orario."
+        : "Sessione di formazione: la VDI non è prenotabile in questo orario.",
+      tone: "lesson",
+    };
+  });
+
+  const allEvents: CalEvent[] = [...events, ...lessonEvents];
 
   function cellDisabled(d: string, hour: number) {
     if (!isBookableDay(d) || d < minDate || d > BOOKING_HORIZON_END) return true;
@@ -246,7 +294,7 @@ export function VdiCalendar({ isAdmin = false }: { isAdmin?: boolean }) {
           today={today}
           minDate={minDate}
           maxDate={BOOKING_HORIZON_END}
-          events={events}
+          events={allEvents}
           cellDisabled={cellDisabled}
           slotDisabled={slotDisabled}
           onCellClick={onCellClick}
@@ -266,6 +314,15 @@ export function VdiCalendar({ isAdmin = false }: { isAdmin?: boolean }) {
             if (s.total === 0) return null;
             return (
               <div className="flex flex-col gap-0.5 text-[11px] leading-tight">
+                {s.dayLessons.map((l) => (
+                  <span
+                    key={`l${l.id}`}
+                    className="truncate rounded border-l-2 border-l-success bg-success/15 px-1 py-0.5 font-medium text-success"
+                    title={`${romeTime(new Date(l.start))}–${romeTime(new Date(l.end))} · Formazione: ${l.title}`}
+                  >
+                    {romeTime(new Date(l.start))} Formazione
+                  </span>
+                ))}
                 {s.dayBookings.slice(0, 3).map((b) => (
                   <span
                     key={b.id}

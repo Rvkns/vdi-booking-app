@@ -122,8 +122,12 @@ export function AdminWiki() {
           <li>Una persona non può avere due lezioni sovrapposte: il salvataggio viene rifiutato indicando i nomi.</li>
           <li>Clicca una lezione esistente per modificarla o eliminarla.</li>
           <li>
-            Le lezioni non occupano la VDI: sono indipendenti dalle prenotazioni. Una lezione conclusa vale come
-            livello svolto per chi vi ha partecipato.
+            Una lezione <strong>occupa la VDI per tutti</strong>: compare nel calendario di ogni utente come slot non
+            disponibile e non è prenotabile. Se in quell&apos;orario esiste già una prenotazione, il salvataggio viene
+            rifiutato indicando chi l&apos;ha fatta.
+          </li>
+          <li>
+            Una lezione conclusa vale come livello svolto per chi vi ha partecipato.
           </li>
         </Bullets>
       </WikiSection>

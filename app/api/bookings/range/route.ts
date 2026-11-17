@@ -44,7 +44,37 @@ export async function GET(req: NextRequest) {
     [resource.id, dayBounds(from).start.toISOString(), dayBounds(to).end.toISOString()]
   );
 
+  // Le sessioni di formazione occupano la VDI: il calendario le mostra come
+  // slot non disponibili, per tutti e non solo per i partecipanti.
+  const lessons = await query<{
+    id: number;
+    title: string;
+    level: number;
+    start: Date;
+    end: Date;
+    participants: number;
+    mine: boolean;
+  }>(
+    `SELECT l.id, l.title, l.level, lower(l.slot) AS start, upper(l.slot) AS "end",
+            (SELECT count(*) FROM lesson_participants x WHERE x.lesson_id = l.id)::int AS participants,
+            EXISTS (SELECT 1 FROM lesson_participants x
+                    WHERE x.lesson_id = l.id AND x.participant_id = $3) AS mine
+     FROM lessons l
+     WHERE l.slot && tstzrange($1, $2)
+     ORDER BY lower(l.slot)`,
+    [dayBounds(from).start.toISOString(), dayBounds(to).end.toISOString(), session.participantId]
+  );
+
   return NextResponse.json({
+    lessons: lessons.map((l) => ({
+      id: l.id,
+      start: l.start,
+      end: l.end,
+      title: l.title,
+      level: l.level,
+      participants: l.participants,
+      mine: l.mine,
+    })),
     bookings: rows.map((r) => ({
       id: r.id,
       start: r.start,
