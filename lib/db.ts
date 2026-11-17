@@ -9,12 +9,32 @@ declare global {
   var __pgPool: Pool | undefined;
 }
 
+/**
+ * Nomi sotto cui puo' arrivare la stringa di connessione. I database creati
+ * dalla dashboard Vercel (Neon, Supabase, Vercel Postgres) iniettano nomi
+ * propri: accettarli tutti evita di dover duplicare a mano la variabile.
+ */
+const CONNECTION_ENV_VARS = [
+  "DATABASE_URL",
+  "POSTGRES_URL",
+  "DATABASE_URL_UNPOOLED",
+  "POSTGRES_URL_NON_POOLING",
+] as const;
+
+export function getConnectionString(): string | undefined {
+  for (const name of CONNECTION_ENV_VARS) {
+    const value = process.env[name];
+    if (value && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
 function createPool() {
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = getConnectionString();
   if (!connectionString) {
     throw new Error(
-      "DATABASE_URL non impostata. Configura la variabile d'ambiente con la " +
-        "stringa di connessione del tuo database Postgres (Vercel Postgres, Neon o Supabase)."
+      `Stringa di connessione Postgres non impostata. Configura una di queste ` +
+        `variabili d'ambiente: ${CONNECTION_ENV_VARS.join(", ")}.`
     );
   }
   return new Pool({

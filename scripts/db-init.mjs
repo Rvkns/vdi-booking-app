@@ -11,9 +11,27 @@ loadEnv();
 
 const sql = readFileSync(new URL("../schema.sql", import.meta.url), "utf-8");
 
+// Stessi nomi accettati da lib/db.ts (i DB creati dalla dashboard Vercel
+// iniettano POSTGRES_URL o DATABASE_URL_UNPOOLED invece di DATABASE_URL).
+const connectionString = [
+  "DATABASE_URL",
+  "POSTGRES_URL",
+  "DATABASE_URL_UNPOOLED",
+  "POSTGRES_URL_NON_POOLING",
+]
+  .map((name) => process.env[name]?.trim())
+  .find((value) => value);
+
+if (!connectionString) {
+  console.error(
+    "Stringa di connessione Postgres non impostata: valorizza DATABASE_URL (o POSTGRES_URL) in .env.local."
+  );
+  process.exit(1);
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes("localhost") ? false : { rejectUnauthorized: false },
+  connectionString,
+  ssl: connectionString.includes("localhost") ? false : { rejectUnauthorized: false },
 });
 
 try {
