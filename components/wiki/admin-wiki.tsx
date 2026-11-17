@@ -131,14 +131,18 @@ export function AdminWiki() {
       <WikiSection title="Partecipanti e corsi già svolti">
         <Bullets>
           <li>
-            I partecipanti si registrano da soli (<Code>nome.cognome</Code>, data di nascita, password scelta da loro),
-            ma <strong>solo se già presenti in elenco</strong>: mettili in elenco prima, poi comunica che possono
-            registrarsi. Chi non è in elenco riceve un rifiuto.
+            I partecipanti <strong>si registrano da soli</strong>: <Code>nome.cognome</Code>, data di nascita e una
+            password scelta da loro. Con quelle credenziali rientrano sempre, senza che tu debba fare nulla.
           </li>
           <li>
-            Per costruire l&apos;elenco hai due strade: il riquadro <strong>Aggiungi un partecipante</strong> (uno alla
-            volta, con i corsi già svolti e il livello atteso) oppure l&apos;import del CSV. In entrambi i casi viene
-            generata una password temporanea, utile se preferisci consegnarla tu invece di far registrare la persona.
+            Devi intervenire solo se qualcuno dimentica la password: nella riga del partecipante premi
+            <strong> Mostra</strong> per leggerla e comunicarla. <strong>Reset</strong> serve nel caso in cui non sia
+            leggibile, e genera una password temporanea da cambiare al primo accesso.
+          </li>
+          <li>
+            Precaricare le persone non è obbligatorio, ma è utile: con <strong>Aggiungi un partecipante</strong> o
+            l&apos;import del CSV imposti in anticipo livello atteso e corsi già svolti. Quando poi si registrano, il
+            profilo esistente viene completato invece di crearne uno nuovo.
           </li>
           <li>
             Nel dialogo <Code>Storico</Code> di ogni partecipante, il riquadro <strong>Corsi già svolti</strong>

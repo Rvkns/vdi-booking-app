@@ -23,9 +23,9 @@ export function LoginWiki() {
           </li>
         </Steps>
         <Note>
-          La registrazione funziona solo se risulti tra i partecipanti del percorso: l&apos;elenco lo carica un
-          amministratore ({OWNERS.join(", ")}). Se ricevi il messaggio &quot;Non risulti tra i partecipanti&quot;,
-          chiedi di essere aggiunto e poi riprova.
+          Da quel momento entri sempre con <strong>nome utente e password</strong>. La data di nascita serve solo a
+          reimpostare la password da solo, se la dimentichi. Se non ci riesci, gli amministratori (
+          {OWNERS.join(", ")}) possono recuperarla e comunicartela.
         </Note>
       </WikiSection>
       <WikiSection title="Password dimenticata">
