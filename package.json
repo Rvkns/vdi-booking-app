@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "vercel-build": "node scripts/db-init.mjs && next build",
     "start": "next start",
     "lint": "next lint",
     "db:init": "node scripts/db-init.mjs"
