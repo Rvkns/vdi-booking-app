@@ -1,16 +1,16 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { LogOut, Sun, Moon, ShieldCheck } from "lucide-react";
+import { LogOut, Sun, Moon } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { useTheme } from "next-themes";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { LoginForm } from "@/components/booking/login-form";
 import { ChangePasswordForm } from "@/components/booking/change-password-form";
 import { LoginWiki } from "@/components/wiki/login-wiki";
 import { UserWiki } from "@/components/wiki/user-wiki";
 import { VdiCalendar } from "@/components/booking/vdi-calendar";
+import { AdminAccessButton, AdminAccessCard } from "@/components/booking/admin-access";
 import { LessonsPanel, NextLessonBanner, type MyLessons } from "@/components/booking/lessons-panel";
 import { cn } from "@/lib/utils";
 
@@ -89,18 +89,7 @@ export default function BookingPage() {
         title="Prenotazione VDI · AI Lab"
         subtitle={`Ciao ${me.nome} ${me.cognome}${me.isAdmin ? " · Admin" : ""}`}
       >
-        {me.isAdmin && (
-          <Link
-            href="/admin"
-            className={buttonVariants({
-              variant: "outline",
-              size: "sm",
-              className: "border-accent bg-accent/20 text-white hover:bg-accent/30",
-            })}
-          >
-            <ShieldCheck className="h-4 w-4" /> Pannello Admin
-          </Link>
-        )}
+        {me.isAdmin && <AdminAccessButton />}
         <Button
           variant="ghost"
           size="icon"
@@ -120,6 +109,8 @@ export default function BookingPage() {
         </Button>
       </AppHeader>
       <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+        {me.isAdmin && <AdminAccessCard nome={me.nome} />}
+
         <NextLessonBanner lessons={lessons} onOpen={() => setTab("lessons")} />
 
         <nav className="flex gap-1 border-b border-border">

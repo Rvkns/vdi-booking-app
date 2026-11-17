@@ -131,8 +131,8 @@ export function AdminWiki() {
       <WikiSection title="Accesso admin e riepilogo operativo">
         <Bullets>
           <li>
-            L&apos;accesso a questa pagina usa una password condivisa (<Code>ADMIN_PASSWORD</Code> su Vercel), distinta da
-            quelle dei partecipanti.
+            L&apos;accesso a questa pagina avviene con la propria utenza: gli owner trovano il pulsante
+            <Code>Pannello Admin</Code> nel loro account. Non esiste una password admin condivisa.
           </li>
           <li>Per cambiare l&apos;orizzonte di date o il numero di livelli serve una modifica al codice.</li>
           <li>Per problemi tecnici contatta uno degli owner: {OWNERS.join(", ")}.</li>

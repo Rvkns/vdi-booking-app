@@ -29,14 +29,15 @@ in locale.
 ```bash
 npm install
 cp .env.example .env.local
-# modifica .env.local con i tuoi valori (DATABASE_URL, SESSION_SECRET, ADMIN_PASSWORD)
+# modifica .env.local con i tuoi valori (DATABASE_URL, SESSION_SECRET)
 
 npm run db:init     # applica schema.sql al database
 npm run dev         # http://localhost:3000
 ```
 
-Apri `http://localhost:3000/admin/login`, accedi con `ADMIN_PASSWORD`, e
-carica il CSV esportato dal foglio `DB_Partecipanti` del report generato
+Apri `http://localhost:3000`, accedi con la tua utenza (gli owner elencati in
+`lib/config.ts` hanno i poteri admin) e usa il pulsante **Pannello Admin** nel
+tuo account. Da li' carica il CSV esportato dal foglio `DB_Partecipanti` del report generato
 dall'agente della Fase 1 (`AI_LAB_Report_Manageriale_*.xlsx`). Il pannello
 mostrerà username e password temporanea generati per ogni nuovo partecipante:
 comunicali manualmente (di persona, in chat) — non c'è alcun invio email.
@@ -61,7 +62,6 @@ comunicali manualmente (di persona, in chat) — non c'è alcun invio email.
 app/
   page.tsx                      Pagina di prenotazione (login → cambio password → calendario)
   admin/page.tsx                Pannello admin (import CSV, reset password)
-  admin/login/page.tsx          Login amministratore
   api/auth/...                  Login, logout, cambio password utente
   api/bookings/...              Lista slot/disponibilità, creazione, annullamento
   api/admin/...                 Login admin, elenco partecipanti, import CSV, reset password
