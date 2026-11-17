@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LessonsAdmin } from "@/components/admin/lessons-admin";
 import { HistoryDialog, PasswordCell } from "@/components/admin/participant-tools";
+import { AddParticipantCard } from "@/components/admin/add-participant";
 import { AdminWiki } from "@/components/wiki/admin-wiki";
 import { cn } from "@/lib/utils";
 import { AppHeader } from "@/components/app-header";
@@ -141,6 +142,8 @@ export default function AdminPage() {
 
       {tab === "people" && (
         <>
+
+      <AddParticipantCard onCreated={load} />
 
       <Card>
         <CardHeader>

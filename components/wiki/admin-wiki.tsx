@@ -132,8 +132,13 @@ export function AdminWiki() {
         <Bullets>
           <li>
             I partecipanti si registrano da soli (<Code>nome.cognome</Code>, data di nascita, password scelta da loro),
-            ma <strong>solo se già presenti in elenco</strong>: carica prima il CSV, poi comunica che possono
+            ma <strong>solo se già presenti in elenco</strong>: mettili in elenco prima, poi comunica che possono
             registrarsi. Chi non è in elenco riceve un rifiuto.
+          </li>
+          <li>
+            Per costruire l&apos;elenco hai due strade: il riquadro <strong>Aggiungi un partecipante</strong> (uno alla
+            volta, con i corsi già svolti e il livello atteso) oppure l&apos;import del CSV. In entrambi i casi viene
+            generata una password temporanea, utile se preferisci consegnarla tu invece di far registrare la persona.
           </li>
           <li>
             Nel dialogo <Code>Storico</Code> di ogni partecipante, il riquadro <strong>Corsi già svolti</strong>
