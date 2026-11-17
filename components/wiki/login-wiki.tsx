@@ -22,6 +22,11 @@ export function LoginWiki() {
             caratteri).
           </li>
         </Steps>
+        <Note>
+          La registrazione funziona solo se risulti tra i partecipanti del percorso: l&apos;elenco lo carica un
+          amministratore ({OWNERS.join(", ")}). Se ricevi il messaggio &quot;Non risulti tra i partecipanti&quot;,
+          chiedi di essere aggiunto e poi riprova.
+        </Note>
       </WikiSection>
       <WikiSection title="Password dimenticata">
         <p>

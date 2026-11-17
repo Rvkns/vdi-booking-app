@@ -8,6 +8,7 @@ import { longDate, romeTime } from "@/lib/calendar";
 import { romeDateString } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 import { levelDescription, levelTitle, type Progress } from "@/lib/levels";
+import { CompletedLevelsCard } from "@/components/booking/completed-levels";
 
 export type MyLesson = {
   id: number;
@@ -102,7 +103,7 @@ const STEP_LABEL: Record<string, string> = {
 };
 
 function ProgressCard({ progress }: { progress: Progress }) {
-  const { steps, next, atteso } = progress;
+  const { steps, next, atteso, declared } = progress;
   return (
     <Card>
       <CardHeader>
@@ -127,7 +128,10 @@ function ProgressCard({ progress }: { progress: Progress }) {
               >
                 <span className="text-xs uppercase tracking-wide opacity-80">Livello {st.level}</span>
                 <span className="text-sm font-semibold">{levelTitle(st.level)}</span>
-                <span className="text-xs opacity-90">{STEP_LABEL[st.status]}</span>
+                <span className="text-xs opacity-90">
+                  {STEP_LABEL[st.status]}
+                  {st.status === "done" && !st.date && declared.includes(st.level) ? " · dichiarato" : ""}
+                </span>
                 {st.date && (
                   <span className="text-xs opacity-90">
                     {new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "short", year: "numeric", timeZone: "Europe/Rome" }).format(new Date(st.date))}
@@ -149,11 +153,18 @@ function ProgressCard({ progress }: { progress: Progress }) {
   );
 }
 
-export function LessonsPanel({ lessons }: { lessons: MyLessons | null }) {
+export function LessonsPanel({
+  lessons,
+  onLevelsChanged,
+}: {
+  lessons: MyLessons | null;
+  onLevelsChanged?: () => void;
+}) {
   if (!lessons) return <p className="text-sm text-muted-foreground">Caricamento…</p>;
   return (
     <div className="flex flex-col gap-4">
       <ProgressCard progress={lessons.progress} />
+      <CompletedLevelsCard onSaved={onLevelsChanged} />
       <Card>
         <CardHeader>
           <CardTitle>Prossime lezioni</CardTitle>

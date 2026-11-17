@@ -1,13 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Copy, Eye, EyeOff } from "lucide-react";
+import { Copy, Eye, EyeOff, GraduationCap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { longDate, romeTime } from "@/lib/calendar";
 import { romeDateString } from "@/lib/slots";
-import type { Progress } from "@/lib/levels";
+import { LEVELS, type Progress } from "@/lib/levels";
 
 /** Password attuale su richiesta (mai caricata finche' non si preme "Mostra"). */
 export function PasswordCell({ participantId, available }: { participantId: number; available: boolean }) {
@@ -68,11 +68,102 @@ export function PasswordCell({ participantId, available }: { participantId: numb
   );
 }
 
+type Declared = { level: number; source: "self" | "admin"; note: string | null };
+
 type HistoryData = {
   participant: { id: number; nome: string; cognome: string; livello_atteso: number | null; livello_affrontato: number };
   lessons: { lesson_id: number; title: string; level: number; attended: boolean; start: string; end: string }[];
   progress: Progress;
+  declared: Declared[];
 };
+
+/**
+ * Corsi gia' svolti registrati per il partecipante. L'admin ha l'ultima
+ * parola: puo' aggiungerne e togliere anche quelli dichiarati dalla persona.
+ */
+function CompletedLevelsEditor({
+  participantId,
+  declared,
+  onSaved,
+}: {
+  participantId: number;
+  declared: Declared[];
+  onSaved: () => void;
+}) {
+  const [selected, setSelected] = React.useState<number[]>(declared.map((d) => d.level));
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => setSelected(declared.map((d) => d.level)), [declared]);
+
+  const sourceOf = new Map(declared.map((d) => [d.level, d.source]));
+  const initial = declared.map((d) => d.level).sort((a, b) => a - b).join(",");
+  const dirty = [...selected].sort((a, b) => a - b).join(",") !== initial;
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/participants/${participantId}/levels`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ levels: selected }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return setError(json.error ?? "Salvataggio non riuscito.");
+      onSaved();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+        <GraduationCap className="h-4 w-4 text-accent" /> Corsi già svolti
+      </h3>
+      <div className="flex flex-wrap gap-2">
+        {LEVELS.map((l) => {
+          const checked = selected.includes(l.level);
+          const src = sourceOf.get(l.level);
+          return (
+            <label
+              key={l.level}
+              title={l.description}
+              className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                checked ? "border-accent bg-accent/10" : "border-border hover:bg-muted"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 accent-[hsl(var(--accent))]"
+                checked={checked}
+                onChange={() =>
+                  setSelected((prev) => (prev.includes(l.level) ? prev.filter((x) => x !== l.level) : [...prev, l.level]))
+                }
+              />
+              L{l.level} · {l.title}
+              {checked && src && (
+                <span className="text-xs text-muted-foreground">
+                  {src === "self" ? "(dichiarato)" : "(registrato)"}
+                </span>
+              )}
+            </label>
+          );
+        })}
+      </div>
+      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+      <div className="mt-2 flex items-center gap-3">
+        <Button size="sm" onClick={save} disabled={busy || !dirty}>
+          {busy ? "Salvataggio…" : "Salva corsi svolti"}
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          Un livello svolto non viene più assegnato in nuove lezioni.
+        </span>
+      </div>
+    </div>
+  );
+}
 
 const STATUS_LABEL = { done: "Svolto", scheduled: "Programmato", next: "Prossimo", todo: "Da fare" } as const;
 
@@ -151,6 +242,15 @@ export function HistoryDialog({
               {error}
             </div>
           )}
+
+          <CompletedLevelsEditor
+            participantId={participantId}
+            declared={data.declared ?? []}
+            onSaved={async () => {
+              await load();
+              onChanged();
+            }}
+          />
 
           <div>
             <h3 className="mb-2 text-sm font-semibold">Lezioni assegnate</h3>

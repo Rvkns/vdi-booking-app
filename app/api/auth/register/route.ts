@@ -69,6 +69,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // La registrazione completa solo profili gia' presenti in elenco (caricati
+  // dall'import CSV): senza questo vincolo chiunque conoscesse il formato
+  // nome.cognome potrebbe crearsi un accesso. Gli owner dell'app sono esentati,
+  // altrimenti non potrebbero creare la prima utenza su un database vuoto.
+  if (!existing && !isAdminUsername(cleanUsername)) {
+    return NextResponse.json(
+      {
+        error:
+          "Non risulti tra i partecipanti del percorso AI Lab. Chiedi a un amministratore di aggiungerti all'elenco, poi completa la registrazione.",
+      },
+      { status: 403 }
+    );
+  }
+
   const passwordHash = await hashPassword(password);
   const passwordEnc = encryptPassword(password);
   const isAdmin = Boolean(existing?.is_admin || isAdminUsername(cleanUsername));

@@ -1,6 +1,8 @@
 // Percorso formativo a livelli. Un livello e' "svolto" se coperto dal livello
-// gia' affrontato importato dall'Excel (1..affrontato) oppure da una lezione
-// conclusa a cui la persona ha partecipato (non segnata assente).
+// gia' affrontato importato dall'Excel (1..affrontato), se dichiarato come
+// gia' svolto (dal partecipante o da un admin, tabella participant_levels),
+// oppure se coperto da una lezione conclusa a cui la persona ha partecipato
+// (non segnata assente).
 
 /** Livelli del percorso formativo (titolo breve + descrizione). */
 export const LEVELS = [
@@ -36,6 +38,8 @@ export type Step = { level: number; status: StepStatus; date?: string };
 export type Progress = {
   atteso: number | null;
   affrontato: number;
+  /** livelli dichiarati come gia' svolti fuori dalle lezioni */
+  declared: number[];
   /** livelli svolti (baseline inclusa) */
   done: number[];
   /** livelli con una lezione futura gia' assegnata */
@@ -55,16 +59,19 @@ export function pickRecommended(target: number, done: number[], scheduledLevels:
 }
 
 export function computeProgress(
-  p: { atteso: number | null; affrontato: number },
+  p: { atteso: number | null; affrontato: number; declared?: number[] },
   lessons: LessonRef[],
   now: number = Date.now()
 ): Progress {
   const past = lessons.filter((l) => new Date(l.end).getTime() <= now && l.attended);
   const future = lessons.filter((l) => new Date(l.end).getTime() > now);
 
-  const done = Array.from(new Set([...range(p.affrontato), ...past.map((l) => l.level)])).sort((a, b) => a - b);
+  const declared = Array.from(new Set(p.declared ?? [])).sort((a, b) => a - b);
+  const done = Array.from(
+    new Set([...range(p.affrontato), ...declared, ...past.map((l) => l.level)])
+  ).sort((a, b) => a - b);
   const scheduled = future.map((l) => ({ level: l.level, lessonId: l.lessonId }));
-  const target = p.atteso ?? p.affrontato;
+  const target = p.atteso ?? Math.max(p.affrontato, ...declared, 0);
 
   const next = range(target).find((l) => !done.includes(l)) ?? null;
   const recommended = pickRecommended(target, done, scheduled.map((s) => s.level));
@@ -80,5 +87,5 @@ export function computeProgress(
     return { level, status: level === next ? "next" : "todo" };
   });
 
-  return { atteso: p.atteso, affrontato: p.affrontato, done, scheduled, next, recommended, steps };
+  return { atteso: p.atteso, affrontato: p.affrontato, declared, done, scheduled, next, recommended, steps };
 }

@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin-guard";
 import { isAdminUsername } from "@/lib/config";
 import { computeProgress, type LessonRef } from "@/lib/levels";
+import { getDeclaredLevelsByParticipant } from "@/lib/participant-levels";
 
 export async function GET() {
   if (!(await requireAdmin())) return NextResponse.json({ error: "Non autorizzato." }, { status: 401 });
@@ -26,14 +27,18 @@ export async function GET() {
     byPerson.set(r.participant_id, list);
   }
 
+  const declaredByPerson = await getDeclaredLevelsByParticipant();
+
   const participants = rows.map((p) => {
+    const declared = declaredByPerson.get(p.id) ?? [];
     const progress = computeProgress(
-      { atteso: p.livello_atteso, affrontato: p.livello_affrontato },
+      { atteso: p.livello_atteso, affrontato: p.livello_affrontato, declared },
       byPerson.get(p.id) ?? []
     );
     return {
       ...p,
       is_admin: Boolean(p.is_admin || isAdminUsername(p.username)),
+      declared,
       done: progress.done,
       scheduled: progress.scheduled,
       next: progress.next,

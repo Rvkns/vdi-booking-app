@@ -129,3 +129,21 @@ ALTER TABLE participants
 UPDATE participants
 SET is_admin = TRUE
 WHERE LOWER(username) IN ('valerio.andreuccioli', 'andrea.balzano');
+
+-- ---------------------------------------------------------------------------
+-- Corsi/livelli gia' svolti: dichiarati dal partecipante stesso oppure
+-- inseriti da un amministratore. Si sommano alla baseline livello_affrontato
+-- (importata dall'Excel) e alle lezioni concluse con presenza.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS participant_levels (
+    participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+    level          SMALLINT NOT NULL CHECK (level BETWEEN 1 AND 9),
+    source         TEXT NOT NULL CHECK (source IN ('self', 'admin')),
+    note           TEXT,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (participant_id, level)
+);
+
+CREATE INDEX IF NOT EXISTS idx_participant_levels_participant ON participant_levels(participant_id);
+
+ALTER TABLE participant_levels ENABLE ROW LEVEL SECURITY;

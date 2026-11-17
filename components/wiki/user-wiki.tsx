@@ -102,6 +102,17 @@ export function UserWiki() {
           </li>
         </Bullets>
       </WikiSection>
+      <WikiSection title="Corsi già svolti">
+        <p>
+          Nella scheda <strong>Le mie lezioni</strong> trovi il riquadro <strong>Corsi già svolti</strong>: segna i
+          livelli che hai affrontato altrove, anche prima di usare questa app. Contano per la tua progressione e non ti
+          verranno riassegnati in nuove lezioni.
+        </p>
+        <Note>
+          Le voci con il lucchetto le ha registrate un amministratore: restano come riferimento ufficiale e non si
+          possono togliere dal profilo. Se c&apos;è un errore, segnalalo agli amministratori ({OWNERS.join(", ")}).
+        </Note>
+      </WikiSection>
     </div>
   );
 }

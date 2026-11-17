@@ -61,6 +61,8 @@ export async function saveLesson(client: PoolClient, id: number | null, input: L
       `SELECT p.nome, p.cognome FROM participants p
        WHERE p.id = ANY($1::int[])
          AND (p.livello_affrontato >= $2
+              OR EXISTS (SELECT 1 FROM participant_levels pl
+                         WHERE pl.participant_id = p.id AND pl.level = $2)
               OR EXISTS (SELECT 1 FROM lesson_participants lp JOIN lessons l ON l.id = lp.lesson_id
                          WHERE lp.participant_id = p.id AND l.level = $2 AND lp.attended
                            AND upper(l.slot) <= now() AND ($3::int IS NULL OR l.id <> $3)))

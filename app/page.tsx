@@ -38,13 +38,18 @@ export default function BookingPage() {
   }, [refreshMe]);
 
   const authenticated = me?.authenticated === true;
-  React.useEffect(() => {
-    if (!authenticated) return;
+
+  const refreshLessons = React.useCallback(() => {
     fetch("/api/lessons")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setLessons(d))
       .catch(() => { });
-  }, [authenticated]);
+  }, []);
+
+  React.useEffect(() => {
+    if (!authenticated) return;
+    refreshLessons();
+  }, [authenticated, refreshLessons]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -134,7 +139,7 @@ export default function BookingPage() {
 
         <section>
           {tab === "vdi" && <VdiCalendar isAdmin={Boolean(me.isAdmin)} />}
-          {tab === "lessons" && <LessonsPanel lessons={lessons} />}
+          {tab === "lessons" && <LessonsPanel lessons={lessons} onLevelsChanged={refreshLessons} />}
           {tab === "guide" && <UserWiki />}
         </section>
       </main>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getCurrentSession } from "@/lib/session";
 import { computeProgress } from "@/lib/levels";
+import { getDeclaredLevels } from "@/lib/participant-levels";
 
 type Row = {
   id: number; title: string; notes: string | null; level: number; attended: boolean;
@@ -27,11 +28,17 @@ export async function GET() {
     [session.participantId]
   );
 
+  const declared = await getDeclaredLevels(session.participantId);
+
   const now = Date.now();
   const upcoming = rows.filter((r) => new Date(r.end).getTime() > now);
   const past = rows.filter((r) => new Date(r.end).getTime() <= now).reverse().slice(0, 30);
   const progress = computeProgress(
-    { atteso: me?.livello_atteso ?? null, affrontato: me?.livello_affrontato ?? 0 },
+    {
+      atteso: me?.livello_atteso ?? null,
+      affrontato: me?.livello_affrontato ?? 0,
+      declared: declared.map((d) => d.level),
+    },
     rows.map((r) => ({ lessonId: r.id, level: r.level, start: r.start, end: r.end, attended: r.attended })),
     now
   );

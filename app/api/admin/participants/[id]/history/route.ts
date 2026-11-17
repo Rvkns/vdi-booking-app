@@ -3,6 +3,7 @@ import { z } from "zod";
 import { pool, query, queryOne } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin-guard";
 import { computeProgress, type LessonRef } from "@/lib/levels";
+import { getDeclaredLevels } from "@/lib/participant-levels";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -27,8 +28,12 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   const refs: LessonRef[] = lessons.map((l) => ({
     lessonId: l.lesson_id, level: l.level, start: l.start, end: l.end, attended: l.attended,
   }));
-  const progress = computeProgress({ atteso: p.livello_atteso, affrontato: p.livello_affrontato }, refs);
-  return NextResponse.json({ participant: p, lessons, progress });
+  const declared = await getDeclaredLevels(id);
+  const progress = computeProgress(
+    { atteso: p.livello_atteso, affrontato: p.livello_affrontato, declared: declared.map((d) => d.level) },
+    refs
+  );
+  return NextResponse.json({ participant: p, lessons, progress, declared });
 }
 
 const schema = z.object({ lessonId: z.number().int(), attended: z.boolean() });

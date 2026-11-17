@@ -128,6 +128,25 @@ export function AdminWiki() {
         </Bullets>
       </WikiSection>
 
+      <WikiSection title="Partecipanti e corsi già svolti">
+        <Bullets>
+          <li>
+            I partecipanti si registrano da soli (<Code>nome.cognome</Code>, data di nascita, password scelta da loro),
+            ma <strong>solo se già presenti in elenco</strong>: carica prima il CSV, poi comunica che possono
+            registrarsi. Chi non è in elenco riceve un rifiuto.
+          </li>
+          <li>
+            Nel dialogo <Code>Storico</Code> di ogni partecipante, il riquadro <strong>Corsi già svolti</strong>
+            registra i livelli completati fuori dalle lezioni. Hai l&apos;ultima parola: puoi aggiungerli e togliere
+            anche quelli dichiarati dalla persona.
+          </li>
+          <li>
+            Un livello che risulta svolto — da file, dichiarazione o lezione conclusa — non può essere riassegnato in
+            una nuova lezione: il salvataggio viene rifiutato indicando i nomi.
+          </li>
+        </Bullets>
+      </WikiSection>
+
       <WikiSection title="Accesso admin e riepilogo operativo">
         <Bullets>
           <li>
